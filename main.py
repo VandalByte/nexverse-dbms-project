@@ -1,4 +1,5 @@
 import sys
+from time import sleep
 from typing import Any
 from datetime import datetime
 import re
@@ -33,7 +34,6 @@ def banner():
     {BLUE} /  \\/ / _ \\ \\/ /\\ \\ / / _ \\ '__/ __|/ _ /
     {BLUE}/ /\\  /  __/>  <  \\ V /  __/ |  \\__ \\  __/
     {BLUE}\\_\\ \\/ \\___/_/\\_\\  \\_/ \\___|_|  |___/\\___|
-
 
                 {RED}Welcome to {BLUE}Nexverse!{RESET}
     """
@@ -96,8 +96,8 @@ def check_table_exists(cursor: Any) -> None:
 
     db_tables = {
         "account": "user_id INT(10) AUTO_INCREMENT PRIMARY KEY, username VARCHAR(20), password VARCHAR(64), email VARCHAR(30), join_date VARCHAR(10), last_login VARCHAR(16), is_private VARCHAR(1)",
-        "user": "username VARCHAR(20) PRIMARY KEY, fname VARCHAR(20), lname VARCHAR(20), bio VARCHAR(120), location VARCHAR(20), age INT(3)",
-        "post": "post_id INT(10) AUTO_INCREMENT VARCHAR(10) PRIMARY KEY, user_id VARCHAR(10), content VARCHAR(500), timestamp VARCHAR(16), comments VARCHAR(10), likes VARCHAR(10)",
+        "user": "username VARCHAR(20) PRIMARY KEY, fname VARCHAR(20), lname VARCHAR(20), bio VARCHAR(120), location VARCHAR(100), age INT(3)",
+        "post": "post_id INT(10) AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(10), content VARCHAR(500), timestamp VARCHAR(16), comments VARCHAR(10), likes VARCHAR(10)",
         "comment": "comment_id INT(10) AUTO_INCREMENT PRIMARY KEY, post_id VARCHAR(10), content VARCHAR(100), timestamp VARCHAR(16), likes VARCHAR(10)",
     }
 
@@ -133,19 +133,19 @@ def is_valid_user(cursor: Any, username: str, email: str) -> bool:
     return True
 
 
-def get_user_info(cursor: Any):
+def signup(cursor: Any):
 
     # Prepare the data to be inserted
     data = {}
     column_prompts = {
-        "username": " Enter Username ---------------- : ",
-        "password": " Enter Password ---------------- : ",
-        "email": " Enter Email ------------------- : ",
-        "fname": " Enter First name -------------- : ",
-        "lname": " Enter Last name --------------- : ",
-        "bio": " Enter Bio --------------------- : ",
-        "location": " Enter Location ---------------- : ",
-        "age": " Enter your Age ---------------- : ",
+        "username": "    Enter Username ---------------- : ",
+        "password": "    Enter Password ---------------- : ",
+        "email": "    Enter Email ------------------- : ",
+        "fname": "    Enter First name -------------- : ",
+        "lname": "    Enter Last name --------------- : ",
+        "bio": "    Enter Bio --------------------- : ",
+        "location": "    Enter Location ---------------- : ",
+        "age": "    Enter your Age ---------------- : ",
     }
 
     buffer = ""
@@ -157,7 +157,11 @@ def get_user_info(cursor: Any):
         while True:
             clear()
             banner()
-            print(f"\n{BLUE} ( SIGN-UP ){RESET}\n")
+            print(f"""{BLUE}
+    ░█▀▀░▀█▀░█▀▀░█▀█░█░█░█▀█
+    ░▀▀█░░█░░█░█░█░█░█░█░█▀▀
+    ░▀▀▀░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░░
+        {RESET}""")
             print(buffer)
             # Prompt the user for input
             user_input = input(prompt)
@@ -208,6 +212,8 @@ def get_user_info(cursor: Any):
     data["last_login"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     data["is_private"] = "Y"  # by default, user account is private
     data["password"] = get_passwd_hash(data["password"])  # hashing password
+    data["username"] = data["username"].lower()  # converting to lower
+    data["email"] = data["email"].lower()  # converting to lower
 
     # checking validity and if data is unique
     if is_valid_user(cursor=cursor, username=data["username"], email=data["email"]):
@@ -237,17 +243,89 @@ def get_user_info(cursor: Any):
         return True
     return False
 
+def login(cursor: Any):
+    # TODO: get input of username and password
+    #     * if username = admin, seperate user controls
+    #     *    other users get small profile, make it in 'profile(username)'
+    #     *
+    
+    #  tHIS FUNC RETURNS USERNAME AND USERID IF USER EXISTS ELSE NONE
+    clear()
+    banner()
+    print(f"""{GREEN}
+    ░█░░░█▀█░█▀▀░▀█▀░█▀█
+    ░█░░░█░█░█░█░░█░░█░█
+    ░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀░▀
+        {RESET}""")
+    user = input("    Enter Username ---------------- : ")
+    print()
+    passwd = input("    Enter Password ---------------- : ")
+    passwd = get_passwd_hash(passwd.strip())  # getting passwd hash
+    
+    # checking if user exists in db
+    query = "SELECT user_id FROM account WHERE username = %s AND password = %s"
+    cursor.execute(query, (user.strip(), passwd))
+    result = cursor.fetchone()
+
+    if result:  # if user exists then returns user's user ID
+        print(f"\n\n\n{GREEN}")
+        print_centered("Login successful!")
+        print(RESET)
+        return result[0]
+
+    print(f"\n\n\n{RED}")
+    print_centered("Login failed!")
+    print(RESET)
+    print_centered("User doesn't exist or Wrong Password!")
+    return None
+
+
+def profile(cursor: Any, user_id: int):
+    clear()
+    banner()
+    print(f"""{YELLOW}
+    ░█▀█░█▀▄░█▀█░█▀▀░▀█▀░█░░░█▀▀
+    ░█▀▀░█▀▄░█░█░█▀▀░░█░░█░░░█▀▀
+    ░▀░░░▀░▀░▀▀▀░▀░░░▀▀▀░▀▀▀░▀▀▀
+        {RESET}""")
+    query = """
+    SELECT user.username, user.fname, user.lname, user.bio, user.location
+    FROM account
+    JOIN user ON account.username = user.username
+    WHERE account.user_id = %s
+    """
+    cursor.execute(query, (user_id,))
+    result = cursor.fetchone()
+    if result:
+        username, fname, lname, bio, location = result
+        profile_head = f"""
+    ###|----|###    {GREEN}{username}{RESET}
+    ###|()()|###    {fname} {lname}
+    #####--#####
+    ###-@  @-###    {YELLOW}П{RESET} {bio}
+    ##        ##
+    ############    {RED}Ṽ{RESET} {location}
+        """
+        print(profile_head)
+    else:
+
+        profile_head = """
+    ###|----|###
+    ###|()()|###
+    #####--#####     {RED}UNKNOWN USER{RESET} 
+    ###-@  @-###
+    ##        ##
+    ############    
+        """
+        print(profile_head)
 
 # main runner function
 def main():
     clear()
     banner()
     # checking the connection with database
-    try:
-        db_conn = sql.connect(host=HOST, user=USER, passwd=PASSWD)
-    except sql.Error as err:
-        print(f"Error connecting to MySQL: {err}")
-        sys.exit()
+
+    db_conn = sql.connect(host=HOST, user=USER, passwd=PASSWD)
 
     print("Running Database check....")
     check_database_exists(cursor=db_conn.cursor(), db_name=DATABASE)
@@ -259,38 +337,57 @@ def main():
     cursor = db_conn.cursor()  # creating cursor object
     # cursor.execute("SET sql_mode = ''")
 
-    check_table_exists(cursor=cursor)                                  # TODO: check if admin exist else create 
+    check_table_exists(cursor=cursor) 
     db_conn.commit()
 
     # adding ADMIN user
-    query = "INSERT INTO user (username, fname, lname, bio, location, age) VALUES (%s, %s, %s, %s, %s, %s)"
-    values = ("admin", "Admin", None, None, None, None)
-    cursor.execute(query, values)
-    query = "INSERT INTO account (username, password, email, join_date, last_login, is_private) VALUES (%s, %s, %s, %s, %s, %s)"
-    values = ("admin",  get_passwd_hash(ADMIN_PASSWD), None, None, None, "Y")
-    cursor.execute(query, values)
-    db_conn.commit()
+    # checking if admin not exists then create
+    cursor.execute("SELECT user_id FROM account WHERE username = %s", ("admin",))
+    admin_check = cursor.fetchone()
+    if not admin_check:
+        query = "INSERT INTO user (username, fname, lname, bio, location, age) VALUES (%s, %s, %s, %s, %s, %s)"
+        values = ("admin", "Admin", None, None, None, None)
+        cursor.execute(query, values)
+        query = "INSERT INTO account (username, password, email, join_date, last_login, is_private) VALUES (%s, %s, %s, %s, %s, %s)"
+        values = ("admin",  get_passwd_hash(ADMIN_PASSWD), None, None, None, "Y")
+        cursor.execute(query, values)
+        db_conn.commit()
+    sleep(2)
 
     # MENU START -----------------------------------------------------------------------------
     while True:
         clear()
         banner()
-        print("\nWhat would you like to do?")
-        print(f"{GREEN}(1) Login")
-        print(f"{BLUE}(2) Sign Up")
-        print(f"{RED}(3) Exit{RESET}")
+        print("\nWhat would you like to do?\n")
+        print(f"(1) {GREEN}Login{RESET}")
+        print(f"(2) {BLUE}Sign Up{RESET}")
+        print(f"(3) {RED}Exit{RESET}")
         choice = input("\nEnter your choice (1-3): ")
 
         if choice == "1":
-            print("WIP :)")
-            input()
+            # TODO: create a login function check if the user present or else ask to create account
+            #       -> func return true is present, else false
+            #       then display profile() module
+            user = login(cursor=cursor)
+            sleep(2)
+            if user:
+                while True:
+                    profile(cursor, user)
+                    input()
+                    break
+                # TODO: WIP
+                if user == 1:  # ADMIN user ID
+                    # ADMIN profile
+                    #  ADMIN can create post and stuff
+                    pass
+                else:
+                    # Other user profile
+                    # User can read the post according to chronological order
+                    pass
 
         elif choice == "2":
-            new_user = get_user_info(cursor=cursor)
-            # TODO: this function should validate if data was added to dict or not, if yes then
-            #       ask user about account creation confirmation:
-            #       if YES: commit the database changes
-            #       if NO : rollback the database changes
+            new_user = signup(cursor=cursor)
+            # ask user about account creation confirmation
             if new_user:
                 confirm = input("Ready to create your account? (Y (default)/N): ")
                 if confirm.upper() == "N":
@@ -318,4 +415,5 @@ if __name__ == "__main__":
         main()
     except sql.Error as err:
         print(f"ERROR: {err}")
+        sys.exit(-1)
 
