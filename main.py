@@ -7,7 +7,6 @@ import os
 import hashlib
 import shutil
 import pandas as pd
-# import matplotlib
 import xlsxwriter
 import matplotlib.pyplot as plt
 from sqlalchemy import create_engine
@@ -25,6 +24,7 @@ RESET = "\033[0m"
 
 # functions
 
+# UTILITY FUNCTIONS =====================================================================
 
 def banner():
     """Prints the Nexverse text art logo with color."""
@@ -56,6 +56,7 @@ def get_passwd_hash(passwd: str) -> str:
     passwd_hash = hashlib.sha256(passwd.encode("UTF-8"))
     return passwd_hash.hexdigest()
 
+# DATABASE FUNCTIONS ====================================================================
 
 def check_database_exists(cursor: Any, db_name: str) -> None:
     """Checks if the given database exists or not, if the database doesn't exist
@@ -115,6 +116,7 @@ def check_table_exists(cursor: Any) -> None:
                 print(f"Failed to create table '{table}': {e}")
     return None
 
+# USER INTERFACE FUNCTIONS ==============================================================
 
 def is_valid_user(cursor: Any, username: str, email: str) -> bool:
     """Checks if the user with same email/username doesn't exist already"""
@@ -125,7 +127,7 @@ def is_valid_user(cursor: Any, username: str, email: str) -> bool:
         print("\n[!] Username already exists!")
         return False
 
-    # Check for duplicate email
+    # check for duplicate email
     cursor.execute("SELECT COUNT(*) FROM account WHERE email = %s", (email,))
     result = cursor.fetchone()
     if result[0] > 0:
@@ -136,7 +138,6 @@ def is_valid_user(cursor: Any, username: str, email: str) -> bool:
 
 def signup(cursor: Any):
 
-    # Prepare the data to be inserted
     data = {}
     column_prompts = {
         "username": "    Enter Username ---------------- : ",
@@ -150,8 +151,7 @@ def signup(cursor: Any):
     }
 
     buffer = ""
-    # Regular expression for email validation
-    email_regex = r"[^@]+@[^@]+\.[^@]+"
+    email_regex = r"[^@]+@[^@]+\.[^@]+"  # email regex
 
     # prompting user for user data
     for column, prompt in column_prompts.items():
@@ -164,10 +164,9 @@ def signup(cursor: Any):
     ░▀▀▀░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░░
         {RESET}""")
             print(buffer)
-            # Prompt the user for input
             user_input = input(prompt)
 
-            # Check for age constraint
+            # check for age constraint
             if column == "age":
                 if not user_input.isdigit() or int(user_input) < 18:
                     print("\n[!] You must be at least 18 years old to use this service!")
@@ -175,7 +174,7 @@ def signup(cursor: Any):
                     clear()
                     continue
 
-            # Check for password length constraint
+            # check for password length constraint
             if column == "password":
                 if len(user_input) < 8:
                     print("\n[!] Password must be at least 8 characters long.")
@@ -183,9 +182,7 @@ def signup(cursor: Any):
                     clear()
                     continue
 
-                # user_input = get_passwd_hash(user_input)  # hashing password
-
-            # Check for email format constraint
+            # check for email format constraint
             if column == "email":
                 if not re.match(email_regex, user_input):
                     print("\n[!] Please enter a valid email address.")
@@ -193,7 +190,7 @@ def signup(cursor: Any):
                     clear()
                     continue
 
-            # Check for non-null constraint on Fname
+            # check for non-null constraint on Fname
             if column == "fname" and not user_input:
                 print("\n[!] First name cannot be empty.")
                 sleep(2)
@@ -244,13 +241,8 @@ def signup(cursor: Any):
         return True
     return False
 
+
 def login(cursor: Any):
-    # TODO: get input of username and password
-    #     * if username = admin, seperate user controls
-    #     *    other users get small profile, make it in 'profile(username)'
-    #     *
-    
-    #  tHIS FUNC RETURNS USERNAME AND USERID IF USER EXISTS ELSE NONE
     clear()
     banner()
     print(f"""{GREEN}
@@ -320,6 +312,7 @@ def profile(cursor: Any, user_id: int):
         """
         print(profile_head)
 
+# POST R/W ==============================================================================
 
 def create_post(cursor, user_id=1):
     categories = {
@@ -369,7 +362,7 @@ def see_posts(cursor, user_id):
         5: "Excellent"
     }
 
-    # Query to fetch posts along with their timestamps
+    # fetch posts along with their timestamps
     cursor.execute("SELECT post_id, content, timestamp FROM post ORDER BY timestamp DESC")
     posts = cursor.fetchall()
 
@@ -410,7 +403,7 @@ def see_posts(cursor, user_id):
 
 
 def admin_see_posts(cursor):
-    # Query to fetch posts along with their average reaction scores
+    # fetch posts along with their average reaction scores
     query = """
     SELECT p.post_id, p.content, p.timestamp, AVG(r.reaction_score) as avg_score
     FROM post p
@@ -426,92 +419,7 @@ def admin_see_posts(cursor):
         print(f" {GREEN}#{post_id}   {BLUE}{timestamp}{RESET}")
         print(f" {content}\n\n")
         # Display the average reaction score
-        print(f" Average Reaction Score: {avg_score:.2f}\n\n")
-
-
-# DATA EXTRACTION =======================================================================
-
-def fetch_table_data(cursor, table_name):
-    cursor.execute('SELECT * FROM ' + table_name)
-    header = [row[0] for row in cursor.description]
-    rows = cursor.fetchall()
-    return header, rows
-
-
-def export_app_data(cursor, table_name):
-    # check if the folder exists else create it
-    data_folder = "Data"
-    if not os.path.exists(data_folder):
-        os.makedirs(data_folder)
-
-    today = datetime.now().strftime('%d%m%Y') # DDMMYYYY
-    filename = f"{table_name}-{today}.xlsx"
-
-    filepath = os.path.join(data_folder, filename)  # file path
-    
-    workbook = xlsxwriter.Workbook(filepath)
-    worksheet = workbook.add_worksheet('Sheet1')
-    header_cell_format = workbook.add_format({'bold': True, 'border': True, 'bg_color': 'yellow'})
-    body_cell_format = workbook.add_format({'border': True})
-    header, rows = fetch_table_data(cursor, table_name)
-    row_index = 0
-    column_index = 0
-    for column_name in header:
-        worksheet.write(row_index, column_index, column_name, header_cell_format)
-        column_index += 1
-    row_index += 1
-    for row in rows:
-        column_index = 0
-        for column in row:
-            worksheet.write(row_index, column_index, column, body_cell_format)
-            column_index += 1
-        row_index += 1
-    print(f' {row_index} Records successfully exported to {filepath}\n')
-    workbook.close()
-
-
-# DATA VISUALIZATION ====================================================================
-
-def fetch_category_scores(engine):
-    query = """
-    SELECT p.category, SUM(r.reaction_score) as total_score
-    FROM post p
-    JOIN reaction r ON p.post_id = r.post_id
-    GROUP BY p.category
-    ORDER BY total_score DESC
-    """
-    df = pd.read_sql_query(query, engine)
-    return df
-
-
-def export_category_scores(df):
-    data_folder = "Data"
-    if not os.path.exists(data_folder):
-        os.makedirs(data_folder)
-
-    today = datetime.now().strftime('%d%m%Y')  # DDMMYYYY
-
-    # Bar Graph
-    plt.figure(figsize=(10, 6))
-    plt.bar(df['category'], df['total_score'])
-    plt.xlabel('Category')
-    plt.ylabel('Total Score')
-    plt.title('Top Categories by Reaction Score')
-    plt.xticks(rotation=45)
-    # saving data to file
-    filename = f"cat-score-bar-{today}.png"
-    path = os.path.join(data_folder, filename)
-    plt.savefig(path)
-
-    # Pie Chart
-    plt.figure(figsize=(10, 6))
-    plt.pie(df['total_score'], labels=df['category'], autopct='%1.1f%%')
-    plt.title('Top Categories by Reaction Score')
-    # saving data to file
-    filename = f"cat-score-pie-{today}.png"
-    path = os.path.join(data_folder, filename)
-    plt.savefig(path)
-
+        print(f" Average Reaction Score: {avg_score}\n\n")
 
 # MAIN CODE =============================================================================
 
@@ -549,7 +457,7 @@ def main():
         db_conn.commit()
     sleep(2)
 
-    # MENU START -----------------------------------------------------------------------------
+    # ============================= MENU STARTS =========================================
     while True:
         clear()
         banner()
@@ -581,7 +489,7 @@ def main():
 
                         elif choice == "2":
                             admin_see_posts(cursor=cursor)
-                            sleep(2)
+                            input()
 
                         elif choice == "3":
                             print(f"{GREEN}\n\n  Exporting data... Please wait...{RESET}")
