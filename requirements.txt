@@ -1,3 +1,5 @@
 mysql-connector-python
-openpyxl
+XlsxWriter
 pandas
+matplotlib
+sqlalchemy
