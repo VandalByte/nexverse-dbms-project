@@ -1,22 +1,5 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>NexVerse DBMS Project</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        h1, h2 {
-            color: #333;
-        }
-        p {
-            line-height: 1.6;
-        }
-        .section {
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
 <body>
 
 <h1 align="center">NexVerse DBMS Project</h1>
