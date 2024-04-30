@@ -312,6 +312,8 @@ def profile(cursor: Any, user_id: int):
         """
         print(profile_head)
 
+
+
 # POST R/W ==============================================================================
 
 def create_post(cursor, user_id=1):
@@ -420,6 +422,90 @@ def admin_see_posts(cursor):
         print(f" {content}\n\n")
         # Display the average reaction score
         print(f" Average Reaction Score: {avg_score}\n\n")
+
+# DATA EXTRACTION =======================================================================
+
+def fetch_table_data(cursor, table_name):
+    cursor.execute('SELECT * FROM ' + table_name)
+    header = [row[0] for row in cursor.description]
+    rows = cursor.fetchall()
+    return header, rows
+
+
+def export_app_data(cursor, table_name):
+    # check if the folder exists else create it
+    data_folder = "Data"
+    if not os.path.exists(data_folder):
+        os.makedirs(data_folder)
+
+    today = datetime.now().strftime('%d%m%Y') # DDMMYYYY
+    filename = f"{table_name}-{today}.xlsx"
+
+    filepath = os.path.join(data_folder, filename)  # file path
+    
+    workbook = xlsxwriter.Workbook(filepath)
+    worksheet = workbook.add_worksheet('Sheet1')
+    header_cell_format = workbook.add_format({'bold': True, 'border': True, 'bg_color': 'yellow'})
+    body_cell_format = workbook.add_format({'border': True})
+    header, rows = fetch_table_data(cursor, table_name)
+    row_index = 0
+    column_index = 0
+    for column_name in header:
+        worksheet.write(row_index, column_index, column_name, header_cell_format)
+        column_index += 1
+    row_index += 1
+    for row in rows:
+        column_index = 0
+        for column in row:
+            worksheet.write(row_index, column_index, column, body_cell_format)
+            column_index += 1
+        row_index += 1
+    print(f' {row_index} Records successfully exported to {filepath}\n')
+    workbook.close()
+
+
+# DATA VISUALIZATION ====================================================================
+
+def fetch_category_scores(engine):
+    query = """
+    SELECT p.category, SUM(r.reaction_score) as total_score
+    FROM post p
+    JOIN reaction r ON p.post_id = r.post_id
+    GROUP BY p.category
+    ORDER BY total_score DESC
+    """
+    df = pd.read_sql_query(query, engine)
+    return df
+
+
+def export_category_scores(df):
+    data_folder = "Data"
+    if not os.path.exists(data_folder):
+        os.makedirs(data_folder)
+
+    today = datetime.now().strftime('%d%m%Y')  # DDMMYYYY
+
+    # Bar Graph
+    plt.figure(figsize=(10, 6))
+    plt.bar(df['category'], df['total_score'])
+    plt.xlabel('Category')
+    plt.ylabel('Total Score')
+    plt.title('Top Categories by Reaction Score')
+    plt.xticks(rotation=45)
+    # saving data to file
+    filename = f"cat-score-bar-{today}.png"
+    path = os.path.join(data_folder, filename)
+    plt.savefig(path)
+
+    # Pie Chart
+    plt.figure(figsize=(10, 6))
+    plt.pie(df['total_score'], labels=df['category'], autopct='%1.1f%%')
+    plt.title('Top Categories by Reaction Score')
+    # saving data to file
+    filename = f"cat-score-pie-{today}.png"
+    path = os.path.join(data_folder, filename)
+    plt.savefig(path)
+
 
 # MAIN CODE =============================================================================
 
